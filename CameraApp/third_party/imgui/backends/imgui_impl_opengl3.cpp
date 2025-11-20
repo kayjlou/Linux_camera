@@ -117,6 +117,18 @@
 #include "imgui.h"
 #ifndef IMGUI_DISABLE
 #include "imgui_impl_opengl3.h"
+
+// Custom GLAD OpenGL loader integration
+#ifdef IMGUI_IMPL_OPENGL_LOADER_CUSTOM
+#ifndef __APPLE__
+    #ifdef USE_GLES
+        #include <gles2.h>
+    #else
+        #include <gl.h>
+    #endif
+#endif
+#endif
+
 #include <stdio.h>
 #include <stdint.h>     // intptr_t
 #if defined(__APPLE__)
