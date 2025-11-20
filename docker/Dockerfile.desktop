@@ -35,8 +35,10 @@ COPY . .
 RUN cd CameraApp && \
     mkdir -p build && \
     cd build && \
-    cmake .. -DSIMULATE_ALL_HARDWARE=ON && \
-    make -j$(nproc)
+    echo "=== CMake configure ===" && \
+    cmake .. -DSIMULATE_ALL_HARDWARE=ON -DDEBUG=ON && \
+    echo "=== Make build ===" && \
+    make -j$(nproc) VERBOSE=1
 
 # Set the entry point
 WORKDIR /app/CameraApp/build

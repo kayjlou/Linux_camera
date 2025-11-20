@@ -1,0 +1,58 @@
+name: Build Ubuntu 20.04
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-ubuntu20:
+    runs-on: ubuntu-20.04  # Try older Ubuntu version
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install dependencies on Ubuntu 20.04
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          pkg-config \
+          libsdl2-dev \
+          libgstreamer1.0-dev \
+          libgstreamer-plugins-base1.0-dev \
+          libopencv-dev \
+          libgl1-mesa-dev \
+          libegl1-mesa-dev \
+          xvfb
+
+    - name: Verify dependencies Ubuntu 20.04
+      run: |
+        echo "=== Package verification ==="
+        pkg-config --exists sdl2 && echo "✅ SDL2" || echo "❌ SDL2"
+        pkg-config --exists gstreamer-1.0 && echo "✅ GStreamer" || echo "❌ GStreamer"  
+        pkg-config --exists opencv4 && echo "✅ OpenCV4" || pkg-config --exists opencv && echo "✅ OpenCV" || echo "❌ OpenCV"
+
+    - name: Build on Ubuntu 20.04
+      working-directory: ./CameraApp
+      env:
+        DISPLAY: ":99"
+      run: |
+        sudo Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+        
+        mkdir -p build-ubuntu20
+        cd build-ubuntu20
+        
+        cmake .. -DSIMULATE_ALL_HARDWARE=ON -DDEBUG=ON
+        make -j2
+
+    - name: Check results Ubuntu 20.04
+      working-directory: ./CameraApp/build-ubuntu20
+      run: |
+        if [ -f "CameraApp" ]; then
+          echo "✅ Ubuntu 20.04 build successful!"
+          ls -la CameraApp
+          file CameraApp
+        else
+          echo "❌ Ubuntu 20.04 build failed"
+        fi

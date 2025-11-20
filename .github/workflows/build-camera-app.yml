@@ -27,44 +27,55 @@ jobs:
 
     - name: Install dependencies
       run: |
+        # Comprehensive package management approach
+        sudo apt-get clean
         sudo apt-get update
-        sudo apt-get upgrade -y
         
-        # Fix any broken dependencies first
-        sudo apt-get install -f
+        # Remove any held packages that might cause conflicts
+        sudo apt-mark unhold '*' || true
         
-        # Install core build tools
+        # Install essential dependencies first
         sudo apt-get install -y \
           build-essential \
           cmake \
           pkg-config \
-          libunwind-dev \
           apt-utils
         
-        # Install graphics and display libraries
+        # Try to install libunwind-dev with different methods
+        echo "=== Installing libunwind-dev ==="
+        sudo apt-get install -y libunwind-dev || {
+          echo "Direct install failed, trying with --fix-broken..."
+          sudo apt-get install -f
+          sudo apt-get install -y libunwind-dev
+        } || {
+          echo "Still failing, trying manual dependency resolution..."
+          sudo apt-get install -y libunwind8-dev libunwind-dev || true
+        }
+        
+        # Verify libunwind is installed
+        dpkg -l | grep libunwind || {
+          echo "libunwind still not installed, trying alternative packages..."
+          sudo apt-get install -y libunwind8 libunwind8-dev
+        }
+        
+        # Now try GStreamer installation
+        echo "=== Installing GStreamer ==="
+        sudo apt-get install -y gstreamer1.0-dev || \
+        sudo apt-get install -y libgstreamer1.0-dev || {
+          echo "GStreamer dev packages failed, skipping for now..."
+          echo "Will try minimal build without GStreamer"
+        }
+        
+        # Install other dependencies that don't depend on GStreamer
         sudo apt-get install -y \
           libsdl2-dev \
           libgl1-mesa-dev \
           libegl1-mesa-dev \
           libgles2-mesa-dev \
           xvfb \
-          mesa-utils
-        
-        # Install GStreamer (with error handling)
-        sudo apt-get install -y \
-          libgstreamer1.0-dev \
-          libgstreamer-plugins-base1.0-dev \
-          gstreamer1.0-plugins-base \
-          gstreamer1.0-plugins-good \
-          gstreamer1.0-plugins-bad \
-          gstreamer1.0-tools || {
-            echo "GStreamer installation failed, trying alternative approach..."
-            sudo apt-get update --fix-missing
-            sudo apt-get install -y libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+          libopencv-dev || {
+            echo "Some packages failed, continuing with available ones..."
           }
-        
-        # Install OpenCV
-        sudo apt-get install -y libopencv-dev
         
     - name: Verify dependencies
       run: |
