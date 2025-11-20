@@ -1,12 +1,18 @@
 cmake_minimum_required(VERSION 3.10)
 project(CameraApp)
 
-if(DEFINED SIMULATE_ALL_HARDWARE)
+# Add build options
+option(SIMULATE_ALL_HARDWARE "Enable hardware simulation for development" OFF)
+option(DEBUG "Enable debug mode" OFF)
+
+if(SIMULATE_ALL_HARDWARE)
     add_compile_definitions(SIMULATE_ALL_HARDWARE)
+    message(STATUS "Hardware simulation enabled")
 endif()
 
-if(DEFINED DEBUG)
+if(DEBUG)
     add_compile_definitions(DEBUG)
+    message(STATUS "Debug mode enabled")
 endif()
 
 # Enable C++17 (or newer)
@@ -25,6 +31,10 @@ if(USE_GLES)
 else()
     message(STATUS "Using desktop OpenGL")
     find_package(OpenGL REQUIRED)
+    # Silence OpenGL deprecation warnings on macOS
+    if(APPLE)
+        add_compile_definitions(GL_SILENCE_DEPRECATION)
+    endif()
 endif()
 
 # Find SDL2
