@@ -43,7 +43,17 @@ if(APPLE)
     set(SDL2_LIBRARIES ${SDL2_LIBRARY})
     set(SDL2_INCLUDE_DIRS /opt/homebrew/include/SDL2)
 else()
-    pkg_check_modules(SDL2 REQUIRED sdl2)
+    # Try pkg-config first, fallback to find_package
+    pkg_check_modules(SDL2 sdl2)
+    if(NOT SDL2_FOUND)
+        find_package(SDL2 REQUIRED)
+        # Handle different SDL2 package configurations
+        if(TARGET SDL2::SDL2)
+            set(SDL2_LIBRARIES SDL2::SDL2)
+        else()
+            set(SDL2_LIBRARIES ${SDL2_LIBRARIES})
+        endif()
+    endif()
 endif()
 
 # Find GStreamer
@@ -57,24 +67,24 @@ set(PROJECT_INCLUDE_DIRS
     ${GSTREAMER_INCLUDE_DIRS}
     ${SDL2_INCLUDE_DIRS}
     ${OpenCV_INCLUDE_DIRS}
-    src
-    src/ErrorHandling
-    src/Hardware
-    src/Hardware/Camera
-    src/Hardware/CommunicationInterfaces
-    src/Hardware/Light
-    src/Hardware/Temperature
-    src/Interaction
-    src/Overlays
-    src/MessageHandling
-    src/Strings
-    src/Testing
-    src/Utils
-    src/Versions
-    third_party/glad
-    third_party/imgui
-    third_party/imgui/backends
-    third_party/stb_image
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ErrorHandling
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Hardware
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Hardware/Camera
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Hardware/CommunicationInterfaces
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Hardware/Light
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Hardware/Temperature
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Interaction
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Overlays
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/MessageHandling
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Strings
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Testing
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Utils
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Versions
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/glad
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/backends
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stb_image
 )
 
 # Source files
@@ -145,7 +155,7 @@ elseif(CMAKE_CROSSCOMPILING) #YOCTO
     target_link_libraries(CameraApp ${GLESv2_LIBRARIES} ${GSTREAMER_LIBRARIES} ${SDL2_LIBRARIES} ${OpenCV_LIBS})
 else()
     message(STATUS "Configuring for Linux")
-    target_link_libraries(CameraApp ${OpenGL_LIBRARY} ${GSTREAMER_LIBRARIES} ${SDL2_LIBRARIES} ${OpenCV_LIBS})
+    target_link_libraries(CameraApp ${OPENGL_LIBRARIES} ${GSTREAMER_LIBRARIES} ${SDL2_LIBRARIES} ${OpenCV_LIBS})
 endif()
 
 target_include_directories(CameraApp PRIVATE ${PROJECT_INCLUDE_DIRS})

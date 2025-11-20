@@ -41,16 +41,32 @@ jobs:
           gstreamer1.0-tools \
           libopencv-dev \
           libgl1-mesa-dev \
-          libglew-dev \
+          libegl1-mesa-dev \
+          libgles2-mesa-dev \
           xvfb
 
     - name: Build desktop application
       working-directory: ./CameraApp
+      env:
+        DISPLAY: ":99"
       run: |
+        # Start virtual display for OpenGL context
+        sudo Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+        
+        # Debug: Show directory structure
+        echo "=== Directory Structure ==="
+        ls -la
+        echo "=== Third Party Directory ==="
+        ls -la third_party/ || echo "No third_party directory found"
+        
         mkdir -p build
         cd build
-        cmake .. -DSIMULATE_ALL_HARDWARE=ON
-        make -j$(nproc)
+        
+        echo "=== Running CMake ==="
+        cmake .. -DSIMULATE_ALL_HARDWARE=ON -DDEBUG=ON
+        
+        echo "=== Running Make ==="
+        make VERBOSE=1 -j$(nproc)
 
     - name: Run tests (if available)
       working-directory: ./CameraApp/build

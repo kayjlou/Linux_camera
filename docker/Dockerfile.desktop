@@ -15,11 +15,13 @@ RUN apt-get update && apt-get install -y \
     libgstreamer-plugins-base1.0-dev \
     libopencv-dev \
     libgl1-mesa-dev \
-    libglew-dev \
+    libegl1-mesa-dev \
+    libgles2-mesa-dev \
     gstreamer1.0-plugins-base \
     gstreamer1.0-plugins-good \
     gstreamer1.0-plugins-bad \
     gstreamer1.0-plugins-ugly \
+    xvfb \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
