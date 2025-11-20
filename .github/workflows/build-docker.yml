@@ -1,19 +1,20 @@
 name: Build with Docker
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'desktop'
+        type: choice
+        options:
+        - desktop
+        - embedded-mock
 
 jobs:
   build-docker:
     runs-on: ubuntu-22.04
-    
-    strategy:
-      matrix:
-        build_type: [desktop, embedded-mock]
     
     steps:
     - name: Checkout code
@@ -23,7 +24,7 @@ jobs:
       uses: docker/setup-buildx-action@v3
 
     - name: Build desktop image
-      if: matrix.build_type == 'desktop'
+      if: github.event.inputs.build_type == 'desktop'
       uses: docker/build-push-action@v5
       with:
         context: .
@@ -34,7 +35,7 @@ jobs:
         cache-to: type=gha,mode=max
 
     - name: Build embedded mock image
-      if: matrix.build_type == 'embedded-mock'
+      if: github.event.inputs.build_type == 'embedded-mock'
       uses: docker/build-push-action@v5
       with:
         context: .
@@ -44,22 +45,34 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
-    - name: Run tests in container
+    - name: Run tests in desktop container
+      if: github.event.inputs.build_type == 'desktop'
       run: |
-        if [ "${{ matrix.build_type }}" == "desktop" ]; then
-          docker run --rm camera-app:desktop /bin/bash -c "cd /app/CameraApp/build && ./CameraApp --version || echo 'Version check completed'"
-        else
-          docker run --rm camera-app:embedded /bin/bash -c "cd /app/CameraApp/build && file ./CameraApp"
-        fi
+        docker run --rm camera-app:desktop /bin/bash -c "cd /app/CameraApp/build && ./CameraApp --version || echo 'Version check completed'"
 
-    - name: Extract artifacts from container
+    - name: Run tests in embedded container
+      if: github.event.inputs.build_type == 'embedded-mock'
+      run: |
+        docker run --rm camera-app:embedded /bin/bash -c "cd /app/CameraApp/build && file ./CameraApp"
+
+    - name: Extract artifacts from desktop container
+      if: github.event.inputs.build_type == 'desktop'
       run: |
         # Create container to extract files
-        if [ "${{ matrix.build_type }}" == "desktop" ]; then
-          CONTAINER_ID=$(docker create camera-app:desktop)
-        else
-          CONTAINER_ID=$(docker create camera-app:embedded)
-        fi
+        CONTAINER_ID=$(docker create camera-app:desktop)
+        
+        # Extract built application and data
+        docker cp $CONTAINER_ID:/app/CameraApp/build ./build-output
+        docker cp $CONTAINER_ID:/app/CameraApp/data ./build-output/ || true
+        
+        # Cleanup
+        docker rm $CONTAINER_ID
+
+    - name: Extract artifacts from embedded container
+      if: github.event.inputs.build_type == 'embedded-mock'
+      run: |
+        # Create container to extract files
+        CONTAINER_ID=$(docker create camera-app:embedded)
         
         # Extract built application and data
         docker cp $CONTAINER_ID:/app/CameraApp/build ./build-output
@@ -71,7 +84,7 @@ jobs:
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: camera-app-${{ matrix.build_type }}
+        name: camera-app-${{ github.event.inputs.build_type }}
         path: |
           build-output/
         retention-days: 30
