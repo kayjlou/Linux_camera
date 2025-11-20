@@ -1,0 +1,72 @@
+name: Debug Package Installation
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug-packages:
+    runs-on: ubuntu-22.04
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Debug package system
+      run: |
+        echo "=== System information ==="
+        lsb_release -a
+        uname -a
+        
+        echo "=== Available package sources ==="
+        cat /etc/apt/sources.list
+        ls /etc/apt/sources.list.d/
+        
+        echo "=== Update package lists ==="
+        sudo apt-get clean
+        sudo apt-get update
+        
+        echo "=== Check for held packages ==="
+        apt-mark showhold
+        
+        echo "=== Search for libunwind ==="
+        apt-cache search libunwind
+        
+        echo "=== Check libunwind8 ==="
+        apt-cache show libunwind8 | head -20
+        
+        echo "=== Check libunwind-dev ==="
+        apt-cache show libunwind-dev | head -20
+        
+    - name: Try different installation approaches
+      run: |
+        echo "=== Approach 1: Install libunwind8 first ==="
+        sudo apt-get install -y libunwind8
+        
+        echo "=== Approach 2: Install libunwind-dev ==="
+        sudo apt-get install -y libunwind-dev
+        
+        echo "=== Approach 3: Now try GStreamer ==="
+        sudo apt-get install -y gstreamer1.0-tools
+        sudo apt-get install -y libgstreamer1.0-0
+        
+        echo "=== Check what we have so far ==="
+        dpkg -l | grep -E "(gstreamer|unwind)"
+        
+        echo "=== Final attempt at libgstreamer1.0-dev ==="
+        sudo apt-get install -y libgstreamer1.0-dev
+        
+    - name: Check dependencies manually
+      run: |
+        echo "=== Manual dependency check ==="
+        apt-cache depends libgstreamer1.0-dev
+        
+        echo "=== Check what's actually installed ==="
+        dpkg -l | grep -E "(gstreamer|unwind|build)"
+
+    - name: Alternative - use aptitude
+      run: |
+        echo "=== Install aptitude for better dependency resolution ==="
+        sudo apt-get install -y aptitude
+        
+        echo "=== Try with aptitude ==="
+        sudo aptitude install -y libgstreamer1.0-dev || echo "Aptitude also failed"
