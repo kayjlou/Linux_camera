@@ -1,0 +1,144 @@
+name: Build Camera Application
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'desktop'
+        type: choice
+        options:
+        - desktop
+        - embedded
+
+jobs:
+  build-desktop:
+    runs-on: ubuntu-22.04
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.build_type == 'desktop' }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          pkg-config \
+          libsdl2-dev \
+          libgstreamer1.0-dev \
+          libgstreamer-plugins-base1.0-dev \
+          libopencv-dev \
+          libgl1-mesa-dev \
+          libglew-dev
+
+    - name: Build desktop application
+      working-directory: ./CameraApp
+      run: |
+        mkdir -p build
+        cd build
+        cmake .. -DSIMULATE_ALL_HARDWARE=ON
+        make -j$(nproc)
+
+    - name: Run tests (if available)
+      working-directory: ./CameraApp/build
+      run: |
+        # Add test commands here when available
+        # ./CameraApp --test || true
+        echo "Desktop build completed successfully"
+
+    - name: Upload desktop artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: camera-app-desktop
+        path: |
+          CameraApp/build/CameraApp
+          CameraApp/data/
+        retention-days: 30
+
+  build-cross-compile:
+    runs-on: ubuntu-22.04
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'embedded' }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up cross-compilation environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          pkg-config \
+          gcc-aarch64-linux-gnu \
+          g++-aarch64-linux-gnu
+
+    - name: Download and setup Yocto SDK (mock)
+      run: |
+        # This is a placeholder - you'll need to provide the actual SDK
+        # or build it in a previous step
+        echo "Mock Yocto SDK setup"
+        echo "In real scenario, download and install the Yocto SDK here"
+        echo "Source the environment setup script"
+
+    - name: Build embedded application (cross-compile)
+      working-directory: ./CameraApp
+      run: |
+        mkdir -p build-embedded
+        cd build-embedded
+        # Mock cross-compilation - replace with actual Yocto environment
+        echo "Cross-compilation would happen here with:"
+        echo "source /opt/fsl-imx-xwayland/6.1-mickledore/environment-setup-armv8a-poky-linux"
+        echo "cmake .. -DUSE_GLES=ON -DSIMULATE_ALL_HARDWARE=ON"
+        echo "make -j\$(nproc)"
+
+    - name: Upload embedded artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: camera-app-embedded
+        path: |
+          CameraApp/build-embedded/
+        retention-days: 30
+
+  # This job would be for a self-hosted runner with Yocto environment
+  build-yocto-image:
+    runs-on: self-hosted  # Requires a self-hosted runner with Yocto setup
+    if: false  # Disabled by default - enable when you have proper Yocto environment
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Yocto environment
+      run: |
+        cd /path/to/yocto/build/directory
+        source setup-environment build_xwayland
+        
+    - name: Update camera app in Yocto layer
+      run: |
+        # Copy the built binary to the Yocto layer
+        cp CameraApp/build/CameraApp /path/to/meta-camera-app/recipes-camera-app/camera-app/files/CameraApp/CameraApp
+
+    - name: Build Yocto image
+      run: |
+        cd /path/to/yocto/build/directory
+        source setup-environment build_xwayland
+        bitbake -c clean camera-app
+        bitbake fsl-image-gui
+
+    - name: Upload Yocto image artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: yocto-linux-image
+        path: |
+          /path/to/yocto/build/directory/tmp/deploy/images/imx8mp-var-dart/*.wic.zst
+          /path/to/yocto/build/directory/tmp/deploy/images/imx8mp-var-dart/*.manifest
+        retention-days: 7

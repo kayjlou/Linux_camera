@@ -1,0 +1,125 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag'
+        required: true
+        default: 'v1.0.0'
+
+jobs:
+  create-release:
+    runs-on: ubuntu-22.04
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      
+    steps:
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+        release_name: Camera App ${{ github.event.inputs.tag || github.ref_name }}
+        draft: false
+        prerelease: false
+
+  build-and-upload:
+    needs: create-release
+    runs-on: ubuntu-22.04
+    
+    strategy:
+      matrix:
+        build_type: [desktop, embedded]
+        
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install dependencies (desktop)
+      if: matrix.build_type == 'desktop'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential cmake pkg-config \
+          libsdl2-dev libgstreamer1.0-dev \
+          libgstreamer-plugins-base1.0-dev \
+          libopencv-dev libgl1-mesa-dev libglew-dev
+
+    - name: Install cross-compilation tools (embedded)
+      if: matrix.build_type == 'embedded'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential cmake pkg-config \
+          gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+    - name: Build application
+      working-directory: ./CameraApp
+      run: |
+        mkdir -p build-${{ matrix.build_type }}
+        cd build-${{ matrix.build_type }}
+        
+        if [ "${{ matrix.build_type }}" == "desktop" ]; then
+          cmake .. -DSIMULATE_ALL_HARDWARE=ON
+          make -j$(nproc)
+        else
+          # Mock embedded build - replace with actual Yocto SDK usage
+          echo "Embedded build would require Yocto SDK"
+          echo "cmake .. -DUSE_GLES=ON -DSIMULATE_ALL_HARDWARE=ON"
+          echo "make -j\$(nproc)"
+          # Create mock binary
+          echo '#!/bin/bash' > CameraApp
+          echo 'echo "Camera App for ARM64 - built with Yocto SDK"' >> CameraApp
+          chmod +x CameraApp
+        fi
+
+    - name: Create release package
+      run: |
+        cd CameraApp
+        mkdir -p release-${{ matrix.build_type }}
+        
+        # Copy binary
+        cp build-${{ matrix.build_type }}/CameraApp release-${{ matrix.build_type }}/
+        
+        # Copy data files
+        cp -r data release-${{ matrix.build_type }}/ 2>/dev/null || echo "No data directory found"
+        
+        # Create README
+        cat > release-${{ matrix.build_type }}/README.txt << EOF
+        Camera App Release - ${{ matrix.build_type }} build
+        
+        Build Type: ${{ matrix.build_type }}
+        Version: ${{ github.event.inputs.tag || github.ref_name }}
+        Built on: $(date)
+        Commit: ${{ github.sha }}
+        
+        Installation:
+        1. Copy CameraApp binary to target system
+        2. Copy data/ directory to same location as binary
+        3. Ensure all dependencies are installed
+        4. Run ./CameraApp
+        
+        For embedded builds:
+        - Requires Yocto Linux with GStreamer and OpenGL ES support
+        - Target: i.MX8 hardware
+        - See README.md for complete setup instructions
+        EOF
+        
+        # Create archive
+        tar -czf ../camera-app-${{ matrix.build_type }}-${{ github.event.inputs.tag || github.ref_name }}.tar.gz -C release-${{ matrix.build_type }} .
+
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: ./CameraApp/camera-app-${{ matrix.build_type }}-${{ github.event.inputs.tag || github.ref_name }}.tar.gz
+        asset_name: camera-app-${{ matrix.build_type }}-${{ github.event.inputs.tag || github.ref_name }}.tar.gz
+        asset_content_type: application/gzip

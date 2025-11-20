@@ -1,0 +1,67 @@
+# Embedded cross-compilation environment (mock)
+FROM ubuntu:22.04
+
+# Avoid interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install cross-compilation toolchain and dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    pkg-config \
+    git \
+    gcc-aarch64-linux-gnu \
+    g++-aarch64-linux-gnu \
+    libc6-dev-arm64-cross \
+    wget \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up cross-compilation environment variables
+ENV CC=aarch64-linux-gnu-gcc
+ENV CXX=aarch64-linux-gnu-g++
+ENV AR=aarch64-linux-gnu-ar
+ENV STRIP=aarch64-linux-gnu-strip
+ENV CMAKE_SYSTEM_NAME=Linux
+ENV CMAKE_SYSTEM_PROCESSOR=aarch64
+ENV CMAKE_C_COMPILER=aarch64-linux-gnu-gcc
+ENV CMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
+
+# Set working directory
+WORKDIR /app
+
+# Copy source code
+COPY . .
+
+# Mock build for embedded target (simplified without actual Yocto SDK)
+RUN cd CameraApp && \
+    mkdir -p build && \
+    cd build && \
+    echo "Mock cross-compilation build for ARM64" && \
+    echo "In real scenario, this would use Yocto SDK" && \
+    echo "cmake .. -DUSE_GLES=ON -DSIMULATE_ALL_HARDWARE=ON -DCMAKE_TOOLCHAIN_FILE=../cmake/aarch64-toolchain.cmake" && \
+    echo "make -j\$(nproc)" && \
+    # Create a mock binary for demonstration
+    echo '#!/bin/bash' > CameraApp && \
+    echo 'echo "Mock Camera App for ARM64"' >> CameraApp && \
+    chmod +x CameraApp
+
+# Create a simple toolchain file for reference
+RUN mkdir -p /app/CameraApp/cmake && \
+    cat > /app/CameraApp/cmake/aarch64-toolchain.cmake << 'EOF'
+# Cross-compilation toolchain file for ARM64
+set(CMAKE_SYSTEM_NAME Linux)
+set(CMAKE_SYSTEM_PROCESSOR aarch64)
+
+set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
+set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
+
+set(CMAKE_FIND_ROOT_PATH /usr/aarch64-linux-gnu)
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+EOF
+
+# Set the entry point
+WORKDIR /app/CameraApp/build
+CMD ["./CameraApp"]

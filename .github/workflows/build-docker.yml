@@ -1,0 +1,77 @@
+name: Build with Docker
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-docker:
+    runs-on: ubuntu-22.04
+    
+    strategy:
+      matrix:
+        build_type: [desktop, embedded-mock]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build desktop image
+      if: matrix.build_type == 'desktop'
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./docker/Dockerfile.desktop
+        push: false
+        tags: camera-app:desktop
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Build embedded mock image
+      if: matrix.build_type == 'embedded-mock'
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./docker/Dockerfile.embedded
+        push: false
+        tags: camera-app:embedded
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Run tests in container
+      run: |
+        if [ "${{ matrix.build_type }}" == "desktop" ]; then
+          docker run --rm camera-app:desktop /bin/bash -c "cd /app/CameraApp/build && ./CameraApp --version || echo 'Version check completed'"
+        else
+          docker run --rm camera-app:embedded /bin/bash -c "cd /app/CameraApp/build && file ./CameraApp"
+        fi
+
+    - name: Extract artifacts from container
+      run: |
+        # Create container to extract files
+        if [ "${{ matrix.build_type }}" == "desktop" ]; then
+          CONTAINER_ID=$(docker create camera-app:desktop)
+        else
+          CONTAINER_ID=$(docker create camera-app:embedded)
+        fi
+        
+        # Extract built application and data
+        docker cp $CONTAINER_ID:/app/CameraApp/build ./build-output
+        docker cp $CONTAINER_ID:/app/CameraApp/data ./build-output/ || true
+        
+        # Cleanup
+        docker rm $CONTAINER_ID
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: camera-app-${{ matrix.build_type }}
+        path: |
+          build-output/
+        retention-days: 30

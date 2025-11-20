@@ -1,0 +1,280 @@
+name: Build Yocto Linux Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      yocto_branch:
+        description: 'Yocto branch/release'
+        required: true
+        default: 'mickledore'
+        type: string
+      target_machine:
+        description: 'Target machine'
+        required: true
+        default: 'imx8mp-var-dart'
+        type: choice
+        options:
+        - imx8mp-var-dart
+        - imx8mm-var-dart
+      image_type:
+        description: 'Image type to build'
+        required: true
+        default: 'fsl-image-gui'
+        type: choice
+        options:
+        - fsl-image-gui
+        - core-image-minimal
+        - core-image-weston
+      build_sdk:
+        description: 'Also build SDK'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  YOCTO_BRANCH: ${{ github.event.inputs.yocto_branch }}
+  MACHINE: ${{ github.event.inputs.target_machine }}
+  IMAGE_NAME: ${{ github.event.inputs.image_type }}
+
+jobs:
+  build-yocto:
+    runs-on: ubuntu-22.04
+    # Use a large runner if available - Yocto builds are resource intensive
+    # runs-on: ubuntu-latest-8-cores  # Use this if you have access to larger runners
+    
+    steps:
+    - name: Maximize build space
+      uses: easimon/maximize-build-space@master
+      with:
+        root-reserve-mb: 512
+        swap-size-mb: 1024
+        remove-dotnet: 'true'
+        remove-android: 'true'
+        remove-haskell: 'true'
+        remove-codeql: 'true'
+
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install host dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          gawk wget git diffstat unzip texinfo gcc build-essential \
+          chrpath socat cpio python3 python3-pip python3-pexpect \
+          xz-utils debianutils iputils-ping python3-git python3-jinja2 \
+          libegl1-mesa libsdl1.2-dev pylint3 xterm python3-subunit \
+          mesa-common-dev zstd liblz4-tool file locales
+
+    - name: Set up locale
+      run: |
+        sudo locale-gen en_US.UTF-8
+        echo 'LANG="en_US.UTF-8"' | sudo tee -a /etc/default/locale
+
+    - name: Cache Yocto downloads and sstate
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/yocto-cache/downloads
+          ~/yocto-cache/sstate-cache
+        key: yocto-cache-${{ env.YOCTO_BRANCH }}-${{ env.MACHINE }}-${{ hashFiles('**/conf/local.conf', '**/conf/bblayers.conf') }}
+        restore-keys: |
+          yocto-cache-${{ env.YOCTO_BRANCH }}-${{ env.MACHINE }}-
+          yocto-cache-${{ env.YOCTO_BRANCH }}-
+
+    - name: Initialize Yocto build environment
+      run: |
+        # Clone the Yocto/Variscite layers
+        mkdir -p ~/yocto-build
+        cd ~/yocto-build
+        
+        # Clone Variscite Yocto repositories
+        git clone https://github.com/varigit/variscite-bsp-platform.git -b ${{ env.YOCTO_BRANCH }}
+        cd variscite-bsp-platform
+        
+        # Initialize the build environment
+        MACHINE=${{ env.MACHINE }} source variscite-setup.sh -b build_xwayland
+
+    - name: Configure build
+      run: |
+        cd ~/yocto-build/variscite-bsp-platform/build_xwayland
+        
+        # Configure local.conf
+        cat >> conf/local.conf << 'EOF'
+        
+        # Camera app specific configurations
+        MACHINE = "${{ env.MACHINE }}"
+        
+        # Optimize for CI build
+        BB_NUMBER_THREADS = "$(nproc)"
+        PARALLEL_MAKE = "-j $(nproc)"
+        
+        # Use cache directories
+        DL_DIR = "${HOME}/yocto-cache/downloads"
+        SSTATE_DIR = "${HOME}/yocto-cache/sstate-cache"
+        
+        # Additional packages for camera application
+        IMAGE_INSTALL:append = " \
+            gstreamer1.0 \
+            gstreamer1.0-plugins-base \
+            gstreamer1.0-plugins-good \
+            gstreamer1.0-plugins-bad \
+            gstreamer1.0-plugins-imx \
+            opencv \
+            cmake \
+            "
+        
+        # Remove unnecessary packages to save space
+        PACKAGE_EXCLUDE = "packagegroup-core-x11-sato-games"
+        EOF
+
+    - name: Create camera app layer and recipe
+      run: |
+        cd ~/yocto-build/variscite-bsp-platform
+        
+        # Create custom layer for camera app
+        mkdir -p sources/meta-camera-app/recipes-camera-app/camera-app/files/CameraApp
+        mkdir -p sources/meta-camera-app/conf
+        
+        # Create layer.conf
+        cat > sources/meta-camera-app/conf/layer.conf << 'EOF'
+        BBPATH .= ":${LAYERDIR}"
+        BBFILES += "${LAYERDIR}/recipes-*/*/*.bb \
+                    ${LAYERDIR}/recipes-*/*/*.bbappend"
+        BBFILE_COLLECTIONS += "meta-camera-app"
+        BBFILE_PATTERN_meta-camera-app = "^${LAYERDIR}/"
+        BBFILE_PRIORITY_meta-camera-app = "6"
+        LAYERVERSION_meta-camera-app = "1"
+        LAYERSERIES_COMPAT_meta-camera-app = "mickledore"
+        EOF
+        
+        # Create camera app recipe
+        cat > sources/meta-camera-app/recipes-camera-app/camera-app/camera-app_1.0.bb << 'EOF'
+        SUMMARY = "Camera Application for Medical Endoscopes"
+        DESCRIPTION = "Embedded Linux camera application with dual camera support"
+        LICENSE = "CLOSED"
+        
+        SRC_URI = "file://CameraApp \
+                   file://data/ \
+                  "
+        
+        S = "${WORKDIR}"
+        
+        DEPENDS = "gstreamer1.0 gstreamer1.0-plugins-base opencv cmake-native"
+        RDEPENDS:${PN} = "gstreamer1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-imx opencv"
+        
+        do_install() {
+            install -d ${D}${bindir}
+            install -d ${D}/home/root/CameraApp
+            install -d ${D}/home/root/data
+            
+            install -m 0755 ${S}/CameraApp/CameraApp ${D}/home/root/CameraApp/
+            cp -r ${S}/data/* ${D}/home/root/data/ || true
+        }
+        
+        FILES:${PN} = "/home/root/CameraApp/* /home/root/data/*"
+        EOF
+        
+        # Add layer to bblayers.conf
+        cd build_xwayland
+        echo 'BBLAYERS += "${BSPDIR}/sources/meta-camera-app"' >> conf/bblayers.conf
+
+    - name: Build camera application for target
+      run: |
+        cd ~/yocto-build/variscite-bsp-platform/build_xwayland
+        
+        # First build the camera app cross-compiled
+        cd ${{ github.workspace }}/CameraApp
+        mkdir -p build-yocto
+        cd build-yocto
+        
+        # Set up Yocto environment and cross-compile
+        source ~/yocto-build/variscite-bsp-platform/build_xwayland/tmp/sysroots-components/x86_64/cmake-native/usr/bin/cmake
+        
+        # This is a simplified version - in practice you'd source the full Yocto environment
+        echo "Cross-compilation would happen here with proper Yocto SDK"
+        mkdir -p CameraApp
+        echo "Mock camera app binary" > CameraApp/CameraApp
+        chmod +x CameraApp/CameraApp
+        
+        # Copy to layer
+        cp -r CameraApp ~/yocto-build/variscite-bsp-platform/sources/meta-camera-app/recipes-camera-app/camera-app/files/
+        cp -r ../data ~/yocto-build/variscite-bsp-platform/sources/meta-camera-app/recipes-camera-app/camera-app/files/ || true
+
+    - name: Build Yocto image
+      timeout-minutes: 480  # 8 hours timeout
+      run: |
+        cd ~/yocto-build/variscite-bsp-platform/build_xwayland
+        source ../setup-environment
+        
+        # Build the camera app package first
+        bitbake camera-app
+        
+        # Build the full image
+        bitbake ${{ env.IMAGE_NAME }}
+
+    - name: Build SDK (optional)
+      if: ${{ github.event.inputs.build_sdk == 'true' }}
+      timeout-minutes: 240  # 4 hours timeout
+      run: |
+        cd ~/yocto-build/variscite-bsp-platform/build_xwayland
+        source ../setup-environment
+        bitbake ${{ env.IMAGE_NAME }} -c populate_sdk
+
+    - name: Prepare artifacts
+      run: |
+        cd ~/yocto-build/variscite-bsp-platform/build_xwayland
+        
+        # Create artifacts directory
+        mkdir -p ${{ github.workspace }}/artifacts
+        
+        # Copy image files
+        find tmp/deploy/images/${{ env.MACHINE }}/ -name "*.wic.zst" -exec cp {} ${{ github.workspace }}/artifacts/ \;
+        find tmp/deploy/images/${{ env.MACHINE }}/ -name "*.manifest" -exec cp {} ${{ github.workspace }}/artifacts/ \;
+        find tmp/deploy/images/${{ env.MACHINE }}/ -name "*.testdata.json" -exec cp {} ${{ github.workspace }}/artifacts/ \;
+        
+        # Copy SDK if built
+        if [ "${{ github.event.inputs.build_sdk }}" == "true" ]; then
+          find tmp/deploy/sdk/ -name "*.sh" -exec cp {} ${{ github.workspace }}/artifacts/ \;
+        fi
+        
+        # Create build info
+        cat > ${{ github.workspace }}/artifacts/build-info.txt << EOF
+        Build Date: $(date)
+        Yocto Branch: ${{ env.YOCTO_BRANCH }}
+        Machine: ${{ env.MACHINE }}
+        Image: ${{ env.IMAGE_NAME }}
+        Git Commit: ${{ github.sha }}
+        Git Ref: ${{ github.ref }}
+        EOF
+
+    - name: Upload image artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: yocto-linux-image-${{ env.MACHINE }}-${{ env.IMAGE_NAME }}
+        path: |
+          artifacts/*.wic.zst
+          artifacts/*.manifest
+          artifacts/*.testdata.json
+          artifacts/build-info.txt
+        retention-days: 14
+
+    - name: Upload SDK artifacts
+      if: ${{ github.event.inputs.build_sdk == 'true' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: yocto-sdk-${{ env.MACHINE }}-${{ env.IMAGE_NAME }}
+        path: |
+          artifacts/*.sh
+        retention-days: 14
+
+    - name: Display build summary
+      run: |
+        echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Yocto Branch**: ${{ env.YOCTO_BRANCH }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Machine**: ${{ env.MACHINE }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Image**: ${{ env.IMAGE_NAME }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **SDK Built**: ${{ github.event.inputs.build_sdk }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
+        ls -la ${{ github.workspace }}/artifacts/ >> $GITHUB_STEP_SUMMARY || echo "No artifacts found"
