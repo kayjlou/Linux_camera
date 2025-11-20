@@ -7,14 +7,6 @@
 * Author: Thorsten Knoelker
 */
 
-#ifndef __APPLE__
-    #ifdef USE_GLES
-        #include <gles2.h>
-    #else
-        #include <gl.h>
-    #endif
-#endif
-
 #include "OverlayRenderer.h"
 #include "Fonts.h"
 #include "BrightnessOverlay.h"

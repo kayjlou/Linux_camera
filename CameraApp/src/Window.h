@@ -14,6 +14,11 @@
     #include <OpenGL/gl3.h>  // macOS uses OpenGL framework
     #include <SDL.h>
 #else
+    #ifdef USE_GLES
+        #include <gles2.h>
+    #else
+        #include <gl.h>
+    #endif
     #include <SDL2/SDL.h>
 #endif
 

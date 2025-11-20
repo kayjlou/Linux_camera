@@ -14,9 +14,9 @@
     #include <OpenGL/gl3.h>  
 #else
     #ifdef USE_GLES
-        #include <GLES3/gl3.h>
+        #include <gles2.h>
     #else
-        #include <GL/gl.h> 
+        #include <gl.h> 
     #endif
 #endif
    

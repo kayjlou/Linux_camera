@@ -17,6 +17,12 @@
 
 #ifdef __APPLE__
     #include <OpenGL/gl3.h>  // macOS uses OpenGL framework
+#else
+    #ifdef USE_GLES
+        #include <gles2.h>
+    #else
+        #include <gl.h>
+    #endif
 #endif
 
 class ImageOverlay : Overlay {
