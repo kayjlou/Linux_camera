@@ -1,22 +1,60 @@
 # GitHub Actions CI/CD Workflows
 
-This repository includes several GitHub Actions workflows for building and releasing the Camera App for embedded Linux systems.
+This repository includes streamlined GitHub Actions workflows for building and releasing the Camera App for embedded Linux systems.
 
 ## Available Workflows
 
 ### 1. Build Camera Application (`build-camera-app.yml`)
 
-**Purpose**: Builds the camera application for desktop and embedded targets.
+**Purpose**: Main CI/CD workflow for building and testing the camera application.
 
 **Triggers**: 
-- Push to `main` or `develop` branches
+- Push to `main` branch
 - Pull requests to `main`
-- Manual dispatch with build type selection
+- Manual dispatch
 
-**Jobs**:
-- `build-desktop`: Builds for desktop Linux with hardware simulation
-- `build-cross-compile`: Cross-compiles for ARM64 (requires Yocto SDK setup)
-- `build-yocto-image`: Builds complete Yocto image (requires self-hosted runner)
+**Features**:
+- Builds for Ubuntu 22.04 with complete dependency resolution
+- Includes OpenGL, GStreamer, SDL2, and OpenCV dependencies
+- Hardware simulation mode for CI environments
+- Artifact upload for successful builds
+
+### 2. Build Yocto Image (`build-yocto-image.yml`)
+
+**Purpose**: Generates complete embedded Linux image for i.MX8 hardware.
+
+**Triggers**: 
+- Manual dispatch only (resource intensive)
+
+**Features**:
+- Full Yocto Linux build with camera app integration
+- Requires large runners (8+ cores, 32GB+ RAM)
+- Produces bootable image for production deployment
+
+### 3. Docker Build (`build-docker.yml`)
+
+**Purpose**: Containerized builds for reproducible development environments.
+
+**Triggers**: 
+- Manual dispatch
+- Push to main (optional)
+
+**Features**:
+- Desktop and embedded build environments
+- Consistent dependency versions
+- Portable development setup
+
+### 4. Release (`release.yml`)
+
+**Purpose**: Automated release creation and asset packaging.
+
+**Triggers**: 
+- Push of version tags (v*)
+
+**Features**:
+- Automated changelog generation
+- Binary artifact packaging
+- Release notes with build information
 
 **Usage**:
 ```bash
