@@ -1,0 +1,105 @@
+name: Debug Build Issues
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug-build:
+    runs-on: ubuntu-22.04
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: System Information
+      run: |
+        echo "=== OS Information ==="
+        cat /etc/os-release
+        echo "=== Compiler Information ==="
+        gcc --version
+        g++ --version
+        echo "=== CMake Information ==="
+        cmake --version
+
+    - name: Install Dependencies Step by Step
+      run: |
+        echo "=== Updating package list ==="
+        sudo apt-get update
+        
+        echo "=== Installing build essentials ==="
+        sudo apt-get install -y build-essential cmake pkg-config
+        
+        echo "=== Installing SDL2 ==="
+        sudo apt-get install -y libsdl2-dev
+        echo "SDL2 check:"
+        pkg-config --modversion sdl2 || echo "SDL2 pkg-config failed"
+        
+        echo "=== Installing OpenGL ==="
+        sudo apt-get install -y libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev
+        echo "OpenGL files:"
+        find /usr/include -name "*gl*.h" | grep -E "(GL/gl\.h|EGL|GLES)" | head -10
+        
+        echo "=== Installing GStreamer ==="
+        sudo apt-get install -y libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+        echo "GStreamer check:"
+        pkg-config --modversion gstreamer-1.0 || echo "GStreamer pkg-config failed"
+        
+        echo "=== Installing OpenCV ==="
+        sudo apt-get install -y libopencv-dev
+        echo "OpenCV check:"
+        pkg-config --modversion opencv4 || pkg-config --modversion opencv || echo "OpenCV pkg-config failed"
+
+    - name: Verify Dependencies
+      run: |
+        echo "=== Verifying all dependencies ==="
+        pkg-config --exists sdl2 && echo "✅ SDL2 OK" || echo "❌ SDL2 MISSING"
+        pkg-config --exists gstreamer-1.0 && echo "✅ GStreamer OK" || echo "❌ GStreamer MISSING"
+        pkg-config --exists gstreamer-app-1.0 && echo "✅ GStreamer-app OK" || echo "❌ GStreamer-app MISSING"
+        pkg-config --exists opencv4 && echo "✅ OpenCV4 OK" || pkg-config --exists opencv && echo "✅ OpenCV OK" || echo "❌ OpenCV MISSING"
+        
+        echo "=== Library paths ==="
+        echo "SDL2 libs: $(pkg-config --libs sdl2 2>/dev/null || echo 'N/A')"
+        echo "GStreamer libs: $(pkg-config --libs gstreamer-1.0 2>/dev/null || echo 'N/A')"
+        echo "OpenCV libs: $(pkg-config --libs opencv4 2>/dev/null || pkg-config --libs opencv 2>/dev/null || echo 'N/A')"
+
+    - name: Check Project Structure
+      working-directory: ./CameraApp
+      run: |
+        echo "=== Project Root ==="
+        ls -la
+        echo "=== Source Directory ==="
+        find src -name "*.h" | head -10
+        echo "=== Third Party ==="
+        ls -la third_party/
+        echo "=== GLAD headers ==="
+        ls -la third_party/glad/
+        echo "=== ImGui headers ==="
+        ls -la third_party/imgui/ | head -10
+
+    - name: CMake Configure with Full Debugging
+      working-directory: ./CameraApp  
+      run: |
+        echo "=== Creating build directory ==="
+        mkdir -p build-debug
+        cd build-debug
+        
+        echo "=== CMake configure with debug output ==="
+        cmake .. \
+          -DSIMULATE_ALL_HARDWARE=ON \
+          -DDEBUG=ON \
+          -DCMAKE_BUILD_TYPE=Debug \
+          -DCMAKE_VERBOSE_MAKEFILE=ON \
+          --debug-output
+
+    - name: Attempt Build (Limited Time)
+      working-directory: ./CameraApp/build-debug
+      run: |
+        echo "=== Starting build (max 5 minutes) ==="
+        timeout 300 make VERBOSE=1 -j2 2>&1 | tee build.log || {
+          echo "Build failed or timed out. Last 100 lines of output:"
+          tail -100 build.log
+          exit 1
+        }
+        
+        echo "=== Build completed successfully ==="
+        ls -la CameraApp

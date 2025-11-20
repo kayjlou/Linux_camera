@@ -46,6 +46,7 @@ else()
     # Try pkg-config first, fallback to find_package
     pkg_check_modules(SDL2 sdl2)
     if(NOT SDL2_FOUND)
+        message(STATUS "SDL2 not found via pkg-config, trying find_package...")
         find_package(SDL2 REQUIRED)
         # Handle different SDL2 package configurations
         if(TARGET SDL2::SDL2)
@@ -54,13 +55,23 @@ else()
             set(SDL2_LIBRARIES ${SDL2_LIBRARIES})
         endif()
     endif()
+    message(STATUS "SDL2 libraries: ${SDL2_LIBRARIES}")
+    message(STATUS "SDL2 include dirs: ${SDL2_INCLUDE_DIRS}")
 endif()
 
 # Find GStreamer
 pkg_check_modules(GSTREAMER REQUIRED gstreamer-1.0 gstreamer-app-1.0)
+message(STATUS "GStreamer libraries: ${GSTREAMER_LIBRARIES}")
+message(STATUS "GStreamer include dirs: ${GSTREAMER_INCLUDE_DIRS}")
 
 # Find OpenCV
 find_package(OpenCV REQUIRED)
+if(OpenCV_FOUND)
+    message(STATUS "OpenCV version: ${OpenCV_VERSION}")
+    message(STATUS "OpenCV libs: ${OpenCV_LIBS}")
+else()
+    message(FATAL_ERROR "OpenCV not found!")
+endif()
 
 # Include directories
 set(PROJECT_INCLUDE_DIRS

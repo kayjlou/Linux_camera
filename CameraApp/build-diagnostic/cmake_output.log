@@ -1,0 +1,24 @@
+-- The C compiler identification is AppleClang 17.0.0.17000013
+-- The CXX compiler identification is AppleClang 17.0.0.17000013
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Hardware simulation enabled
+-- Found PkgConfig: /opt/homebrew/bin/pkg-config (found version "2.5.1")
+-- Using desktop OpenGL
+-- Found OpenGL: /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/OpenGL.framework
+-- Checking for modules 'gstreamer-1.0;gstreamer-app-1.0'
+--   Found gstreamer-1.0, version 1.26.5
+--   Found gstreamer-app-1.0, version 1.26.5
+-- Found OpenCV: /opt/homebrew/Cellar/opencv/4.12.0_1 (found version "4.12.0")
+-- Configuring for macOS
+-- Configuring done (0.8s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Users/katielewis/Desktop/Linux_camera/CameraApp/build-diagnostic

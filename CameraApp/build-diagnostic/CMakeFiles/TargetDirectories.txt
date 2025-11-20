@@ -1,0 +1,3 @@
+/Users/katielewis/Desktop/Linux_camera/CameraApp/build-diagnostic/CMakeFiles/CameraApp.dir
+/Users/katielewis/Desktop/Linux_camera/CameraApp/build-diagnostic/CMakeFiles/edit_cache.dir
+/Users/katielewis/Desktop/Linux_camera/CameraApp/build-diagnostic/CMakeFiles/rebuild_cache.dir
