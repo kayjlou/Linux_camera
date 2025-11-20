@@ -104,6 +104,7 @@ set(PROJECT_INCLUDE_DIRS
 # Source files
 set(SRC_FILES
     src/main.cpp
+    src/glad_loader.cpp
     src/Fonts.cpp
     src/OverlayRenderer.cpp
     src/Video.cpp

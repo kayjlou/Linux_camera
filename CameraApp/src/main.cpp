@@ -8,13 +8,11 @@
  */
 
 #ifndef __APPLE__
-#ifdef USE_GLES
-#define GLAD_GLES2_IMPLEMENTATION
-#include <gles2.h>
-#else
-#define GLAD_GL_IMPLEMENTATION
-#include <gl.h>
-#endif
+    #ifdef USE_GLES
+        #include <gles2.h>
+    #else
+        #include <gl.h>
+    #endif
 #endif
 
 #include <gst/gst.h>
@@ -175,6 +173,21 @@ int main() {
     if (!window.open()) {
         return -1;
     }
+
+#ifndef __APPLE__
+    // Initialize GLAD after OpenGL context is created
+    #ifdef USE_GLES
+        if (!gladLoadGLES2((GLADloadfunc)SDL_GL_GetProcAddress)) {
+            std::cerr << "Failed to initialize GLAD for OpenGL ES" << std::endl;
+            return -1;
+        }
+    #else
+        if (!gladLoadGL((GLADloadfunc)SDL_GL_GetProcAddress)) {
+            std::cerr << "Failed to initialize GLAD for OpenGL" << std::endl;
+            return -1;
+        }
+    #endif
+#endif
 
     AppState appState = AppState::InitApp;
     std::chrono::time_point<std::chrono::high_resolution_clock> showInstructionsStartTime;
