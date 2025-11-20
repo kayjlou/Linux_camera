@@ -171,5 +171,5 @@ endif()
 
 target_include_directories(CameraApp PRIVATE ${PROJECT_INCLUDE_DIRS})
 
-# Enable high warning levels
-target_compile_options(CameraApp PRIVATE -Wall -Wextra -pedantic)
+# Enable high warning levels but suppress warnings for third-party code
+target_compile_options(CameraApp PRIVATE -Wall -Wextra -pedantic -Wno-unused-function)
