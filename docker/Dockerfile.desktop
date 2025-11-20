@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     cmake \
     pkg-config \
     git \
+    libunwind-dev \
     libsdl2-dev \
     libgstreamer1.0-dev \
     libgstreamer-plugins-base1.0-dev \
