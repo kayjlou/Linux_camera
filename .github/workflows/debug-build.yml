@@ -34,16 +34,16 @@ jobs:
         echo "SDL2 check:"
         pkg-config --modversion sdl2 || echo "SDL2 pkg-config failed"
         
-        echo "=== Installing OpenGL ==="
-        sudo apt-get install -y libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev
+        echo "=== Installing all dependencies in one step ==="
+        sudo apt-get install -y \
+          libgl1-mesa-dev \
+          libglu1-mesa-dev \
+          freeglut3-dev \
+          libgstreamer1.0-dev \
+          libgstreamer-plugins-base1.0-dev \
+          libunwind-dev
         echo "OpenGL files:"
         find /usr/include -name "*gl*.h" | grep -E "(GL/gl\.h|EGL|GLES)" | head -10
-        
-        echo "=== Installing GStreamer dependencies ==="
-        sudo apt-get install -y libunwind-dev
-        
-        echo "=== Installing GStreamer ==="
-        sudo apt-get install -y libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
         echo "GStreamer check:"
         pkg-config --modversion gstreamer-1.0 || echo "GStreamer pkg-config failed"
         

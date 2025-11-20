@@ -21,10 +21,27 @@ jobs:
         cmake --version
         pkg-config --version
 
-    - name: Install basic dependencies
+    - name: Install all dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential cmake pkg-config
+        
+        # Fix broken packages first
+        sudo apt-mark unhold '*' || true
+        sudo apt-get install -f
+        
+        # Install all required dependencies in one step
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          pkg-config \
+          libgl1-mesa-dev \
+          libglu1-mesa-dev \
+          freeglut3-dev \
+          libgstreamer1.0-dev \
+          libgstreamer-plugins-base1.0-dev \
+          libunwind-dev \
+          libsdl2-dev \
+          libopencv-dev
 
     - name: Check project structure
       run: |

@@ -13,21 +13,31 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Install essential build tools
+    - name: Install all dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential cmake pkg-config
-
-    - name: Install SDL2
-      run: |
-        sudo apt-get install -y libsdl2-dev
+        
+        # Fix broken packages first
+        sudo apt-mark unhold '*' || true
+        sudo apt-get install -f
+        
+        # Install all required dependencies in one step
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          pkg-config \
+          libgl1-mesa-dev \
+          libglu1-mesa-dev \
+          freeglut3-dev \
+          libgstreamer1.0-dev \
+          libgstreamer-plugins-base1.0-dev \
+          libunwind-dev \
+          libsdl2-dev \
+          libopencv-dev
+        
+        # Verify installations
         pkg-config --exists sdl2 && echo "✅ SDL2 found" || echo "❌ SDL2 not found"
-        pkg-config --cflags sdl2
-        pkg-config --libs sdl2
-
-    - name: Install OpenGL
-      run: |
-        sudo apt-get install -y libgl1-mesa-dev libegl1-mesa-dev
+        pkg-config --exists gstreamer-1.0 && echo "✅ GStreamer found" || echo "❌ GStreamer not found"
         ls /usr/include/GL/ || echo "No GL headers found"
         find /usr -name "libGL*" 2>/dev/null | head -5
 

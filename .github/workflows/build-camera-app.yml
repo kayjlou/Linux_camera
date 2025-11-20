@@ -27,66 +27,50 @@ jobs:
 
     - name: Install dependencies
       run: |
-        # Comprehensive package management approach
-        sudo apt-get clean
         sudo apt-get update
         
-        # Remove any held packages that might cause conflicts
+        # Address broken/held packages first
         sudo apt-mark unhold '*' || true
+        sudo apt-get install -f
         
-        # Install essential dependencies first
+        # Install all required dependencies in one step to avoid conflicts
         sudo apt-get install -y \
           build-essential \
           cmake \
           pkg-config \
-          apt-utils
-        
-        # Try to install libunwind-dev with different methods
-        echo "=== Installing libunwind-dev ==="
-        sudo apt-get install -y libunwind-dev || {
-          echo "Direct install failed, trying with --fix-broken..."
-          sudo apt-get install -f
-          sudo apt-get install -y libunwind-dev
-        } || {
-          echo "Still failing, trying manual dependency resolution..."
-          sudo apt-get install -y libunwind8-dev libunwind-dev || true
-        }
-        
-        # Verify libunwind is installed
-        dpkg -l | grep libunwind || {
-          echo "libunwind still not installed, trying alternative packages..."
-          sudo apt-get install -y libunwind8 libunwind8-dev
-        }
-        
-        # Now try GStreamer installation
-        echo "=== Installing GStreamer ==="
-        sudo apt-get install -y gstreamer1.0-dev || \
-        sudo apt-get install -y libgstreamer1.0-dev || {
-          echo "GStreamer dev packages failed, skipping for now..."
-          echo "Will try minimal build without GStreamer"
-        }
-        
-        # Install other dependencies that don't depend on GStreamer
-        sudo apt-get install -y \
-          libsdl2-dev \
           libgl1-mesa-dev \
+          libglu1-mesa-dev \
+          freeglut3-dev \
+          libgstreamer1.0-dev \
+          libgstreamer-plugins-base1.0-dev \
+          libunwind-dev \
+          libsdl2-dev \
           libegl1-mesa-dev \
           libgles2-mesa-dev \
-          xvfb \
-          libopencv-dev || {
-            echo "Some packages failed, continuing with available ones..."
-          }
+          libopencv-dev \
+          gstreamer1.0-plugins-base \
+          gstreamer1.0-plugins-good \
+          gstreamer1.0-plugins-bad \
+          gstreamer1.0-tools \
+          xvfb
         
     - name: Verify dependencies
       run: |
-        echo "=== Verifying installed packages ==="
-        dpkg -l | grep -E "(gstreamer|opencv|sdl2|libgl|cmake)" || echo "Some packages might be missing"
+        echo "=== Verifying critical packages ==="
+        dpkg -l | grep -E "(gstreamer|opencv|sdl2|libgl|cmake|libunwind)" || echo "Some packages might be missing"
+        
+        echo "=== Checking OpenGL ==="
+        find /usr -name "libGL.so*" 2>/dev/null | head -3
+        find /usr/include -name "GL.h" 2>/dev/null | head -3
         
         echo "=== Checking pkg-config ==="
-        pkg-config --exists sdl2 && echo "✅ SDL2" || echo "❌ SDL2 missing"
-        pkg-config --exists gstreamer-1.0 && echo "✅ GStreamer" || echo "❌ GStreamer missing"  
-        pkg-config --exists gstreamer-app-1.0 && echo "✅ GStreamer-app" || echo "❌ GStreamer-app missing"
-        pkg-config --exists opencv4 && echo "✅ OpenCV4" || pkg-config --exists opencv && echo "✅ OpenCV" || echo "❌ OpenCV missing"
+        pkg-config --exists sdl2 && echo "✅ SDL2: $(pkg-config --modversion sdl2)" || echo "❌ SDL2 missing"
+        pkg-config --exists gstreamer-1.0 && echo "✅ GStreamer: $(pkg-config --modversion gstreamer-1.0)" || echo "❌ GStreamer missing"  
+        pkg-config --exists gstreamer-app-1.0 && echo "✅ GStreamer-app: $(pkg-config --modversion gstreamer-app-1.0)" || echo "❌ GStreamer-app missing"
+        pkg-config --exists opencv4 && echo "✅ OpenCV4: $(pkg-config --modversion opencv4)" || pkg-config --exists opencv && echo "✅ OpenCV: $(pkg-config --modversion opencv)" || echo "❌ OpenCV missing"
+        
+        echo "=== OpenGL library check ==="
+        pkg-config --exists gl && echo "✅ OpenGL: $(pkg-config --modversion gl)" || echo "ℹ️  OpenGL not available via pkg-config (normal for system OpenGL)"
 
     - name: Build desktop application
       working-directory: ./CameraApp
