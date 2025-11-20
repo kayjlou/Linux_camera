@@ -37,6 +37,9 @@ else()
     endif()
 endif()
 
+# Tell ImGui to use our GLAD loader instead of its own
+add_compile_definitions(IMGUI_IMPL_OPENGL_LOADER_CUSTOM)
+
 # Find SDL2
 if(APPLE)
     find_library(SDL2_LIBRARY SDL2 PATHS /Library/Frameworks /opt/homebrew/Library/Frameworks)
