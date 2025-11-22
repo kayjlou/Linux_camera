@@ -37,7 +37,7 @@ else()
     endif()
 endif()
 
-# Tell ImGui to use our GLAD loader instead of its own
+# Configure ImGui to use GLAD by defining the custom loader and setting up includes
 add_compile_definitions(IMGUI_IMPL_OPENGL_LOADER_CUSTOM)
 
 # Find SDL2

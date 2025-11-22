@@ -154,22 +154,45 @@ jobs:
         DESCRIPTION = "Embedded Linux camera application with dual camera support"
         LICENSE = "CLOSED"
         
-        SRC_URI = "file://CameraApp \
-                   file://data/ \
+        SRC_URI = "file://src \
+                   file://third_party \
+                   file://data \
+                   file://CMakeLists.txt \
                   "
         
         S = "${WORKDIR}"
+        B = "${WORKDIR}/build"
         
-        DEPENDS = "gstreamer1.0 gstreamer1.0-plugins-base opencv cmake-native"
-        RDEPENDS:${PN} = "gstreamer1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-imx opencv"
+        DEPENDS = "gstreamer1.0 gstreamer1.0-plugins-base opencv cmake-native libsdl2"
+        RDEPENDS:${PN} = "gstreamer1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-imx opencv libsdl2-2.0-0"
+        
+        inherit cmake
+        
+        EXTRA_OECMAKE = " \
+            -DUSE_GLES=ON \
+            -DSIMULATE_ALL_HARDWARE=OFF \
+            -DDEBUG=OFF \
+        "
+        
+        do_configure() {
+            cmake_do_configure
+        }
+        
+        do_compile() {
+            cmake_do_compile
+        }
         
         do_install() {
-            install -d ${D}${bindir}
             install -d ${D}/home/root/CameraApp
             install -d ${D}/home/root/data
             
-            install -m 0755 ${S}/CameraApp/CameraApp ${D}/home/root/CameraApp/
-            cp -r ${S}/data/* ${D}/home/root/data/ || true
+            # Install the built camera app binary
+            install -m 0755 ${B}/CameraApp ${D}/home/root/CameraApp/
+            
+            # Install data files
+            if [ -d "${S}/data" ]; then
+                cp -r ${S}/data/* ${D}/home/root/data/ || true
+            fi
         }
         
         FILES:${PN} = "/home/root/CameraApp/* /home/root/data/*"
@@ -179,27 +202,28 @@ jobs:
         cd build_xwayland
         echo 'BBLAYERS += "${BSPDIR}/sources/meta-camera-app"' >> conf/bblayers.conf
 
-    - name: Build camera application for target
+    - name: Copy camera app source to Yocto layer
       run: |
-        cd ~/yocto-build/variscite-bsp-platform/build_xwayland
+        # Copy the camera app source components to the Yocto recipe files
+        # The Yocto recipe will build it using the proper cross-compilation toolchain
         
-        # First build the camera app cross-compiled
-        cd ${{ github.workspace }}/CameraApp
-        mkdir -p build-yocto
-        cd build-yocto
+        # Create recipe files directory
+        RECIPE_FILES_DIR=~/yocto-build/variscite-bsp-platform/sources/meta-camera-app/recipes-camera-app/camera-app/files
+        mkdir -p $RECIPE_FILES_DIR
         
-        # Set up Yocto environment and cross-compile
-        source ~/yocto-build/variscite-bsp-platform/build_xwayland/tmp/sysroots-components/x86_64/cmake-native/usr/bin/cmake
+        # Copy source components that the recipe expects
+        cp -r ${{ github.workspace }}/CameraApp/src $RECIPE_FILES_DIR/
+        cp -r ${{ github.workspace }}/CameraApp/third_party $RECIPE_FILES_DIR/
+        cp ${{ github.workspace }}/CameraApp/CMakeLists.txt $RECIPE_FILES_DIR/
         
-        # This is a simplified version - in practice you'd source the full Yocto environment
-        echo "Cross-compilation would happen here with proper Yocto SDK"
-        mkdir -p CameraApp
-        echo "Mock camera app binary" > CameraApp/CameraApp
-        chmod +x CameraApp/CameraApp
+        # Copy data directory if it exists
+        if [ -d "${{ github.workspace }}/CameraApp/data" ]; then
+          cp -r ${{ github.workspace }}/CameraApp/data $RECIPE_FILES_DIR/
+        fi
         
-        # Copy to layer
-        cp -r CameraApp ~/yocto-build/variscite-bsp-platform/sources/meta-camera-app/recipes-camera-app/camera-app/files/
-        cp -r ../data ~/yocto-build/variscite-bsp-platform/sources/meta-camera-app/recipes-camera-app/camera-app/files/ || true
+        # Debug: List what we copied
+        echo "=== Files copied to Yocto recipe ==="
+        ls -la $RECIPE_FILES_DIR
 
     - name: Build Yocto image
       timeout-minutes: 480  # 8 hours timeout
